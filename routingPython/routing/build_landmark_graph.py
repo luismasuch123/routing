@@ -1,3 +1,7 @@
+"""
+This class builds the landmark graph by counting the amount of times an edge is part of a taxi trajectory
+and returning the k landmarks which appear most often.
+"""
 import os
 import pandas as pd
 
