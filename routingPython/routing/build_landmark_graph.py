@@ -10,10 +10,10 @@ import pandas as pd
 def count_edges(dirPath_edge_id_lists):
     for file in os.listdir(dirPath_edge_id_lists):
         path = os.path.join(dirPath_edge_id_lists, file)
-        df = pd.read_csv(path, names=['edge'], skiprows=[0])
+        df = pd.read_csv(path, names=['ID', 'DAY', 'TIME'], skiprows=[0], sep=" ", skipinitialspace=True)
         edge_count = {}
         for i, row in df.iterrows():
-            edge_count[row['edge']] = edge_count.get(row['edge'], 0) + 1
+            edge_count[row['ID']] = edge_count.get(row['ID'], 0) + 1
     return edge_count
 
 def get_k_landmarks(k, dirPath_edge_id_lists):
