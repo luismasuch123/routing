@@ -3,45 +3,65 @@ import os
 import pandas as pd
 from collections import defaultdict
 from operator import itemgetter
+import numpy as np
+import datetime
 from dateutil import parser
 
-def get_common_trips(landmark_j, landmark_k, dirPath_edge_id_lists):
-    common_trips = defaultdict(list)
+def get_common_trips(landmarks, landmark_j, landmark_k, dirPath_edge_id_lists, common_trips):
+    '''
+    returns the edge_id_lists which contain both landmarks in the order j-k
+    '''
+    #TODO: zwischen landmarks dürfen keine weiteren landmarks auftauchen
     for file in os.listdir(dirPath_edge_id_lists):
         path = os.path.join(dirPath_edge_id_lists, file)
-        df = pd.read_csv(path, names=['edge'])
+        df = pd.read_csv(path, names=['ID', 'DAY', 'TIME'], skiprows=[0], sep=" ", skipinitialspace=True)
         landmark_j_found = False
         landmark_k_found = False
-        landmark_j_first = False
-        landmark_k_first = False
         for i, row in df.iterrows():
-            if row['edge'] == landmark_j:
-                landmark_j_found = True
-                if not landmark_k_first:
-                    landmark_j_first = True
-            elif row['edge'] == landmark_k:
-                landmark_k_found = True
-                if not landmark_j_first:
-                    landmark_k_first = True
-        if landmark_j_found and landmark_k_found:
-            print(str(landmark_j) + "-" + str(landmark_k))
-            if landmark_j_first:
-                key = str(landmark_j) + "-" + str(landmark_k)
-                common_trips[key].append(int(file.replace(".txt", "")))
+            if not landmark_k_found:
+                if row['ID'] == landmark_j:
+                    landmark_j_found = True
+                elif row['ID'] == landmark_k and landmark_j_found:
+                    key = str(landmark_j) + "-" + str(landmark_k)
+                    common_trips[key].append(int(file.replace(".txt", "")))
+                    landmark_k_found = True
+                elif landmark_j_found and row['ID'] in landmarks and row['ID'] != landmark_k:
+                    # zwischen landmarks dürfen sich keine weiteren landmarks befinden, um die travel_time zu schätzen
+                    landmark_j_found = False
             else:
-                key = str(landmark_k) + "-" + str(landmark_j)
-                common_trips[key].append(int(file.replace(".txt", "")))
-            print(common_trips)
+                break
     return common_trips
-#TODO: berücksichtigen, dass Strecken zwischen landmarks mehrmals in einer Fahrt befahren werden könnten bzw. beide Richtungen, dann gps_log mehrmals vermerken
-#TODO: aber Logs gestückelt betrachten (falls Pausen), da sonst verfälschte Fahrtzeiten berechnet werden
 
-def get_travel_times(landmark_j, landmark_k, streets_path, trip_path):
-    gps_points = match_gps_points(landmark_j, landmark_k, streets_path, trip_path)
-    print("gps points: " + str(gps_points))
-    time_delta = parser.parse(gps_points['time_k']) - parser.parse(gps_points['time_j'])
-    day_time = gps_points['time_j']
-    travel_time = {'day time': day_time, 'time delta': time_delta}
+def get_travel_times(landmarks, landmark_j, landmark_k, edge_id_list_extended_path):
+    '''
+    searches for edge_id_lists which contain both landmarks in the order j-k one or multiple times and computes the travel_time between those landmarks,
+    which are then returned
+    '''
+    # TODO: zwischen landmarks dürfen keine weiteren landmarks auftauchen
+    df = pd.read_csv(edge_id_list_extended_path, names=['ID', 'DAY', 'TIME'], skiprows=[0], sep=" ", skipinitialspace=True)
+    #Zeilen zusammenführen, um sie dann in datetime umzuwandeln
+    df['DATETIME'] = df['DAY'].astype((str)) + " " + df['TIME'].astype(str)
+    df.drop('DAY', 1, inplace=True)
+    df.drop('TIME', 1, inplace=True)
+    df['DATETIME'] = pd.to_datetime(df['DATETIME'], errors='coerce')
+
+    # hier wird die Zeit, die von einer zur anderen landmark benötigt wird(time_delta) und der Startzeitpunkt(day_time) gespeichert
+    travel_time = defaultdict(list)
+    landmark_j_found_current = False
+    for i, row in df.iterrows():
+        if row['ID'] == landmark_j:
+            landmark_j_found_current = True
+            time_j = row['DATETIME']
+        elif row['ID'] == landmark_k and landmark_j_found_current:
+            time_k = row['DATETIME']
+            time_delta = time_k - time_j
+            travel_time['delta_time'].append(time_delta)
+            travel_time['day_time'].append(time_j)
+            landmark_j_found_current = False
+        elif landmark_j_found_current and row['ID'] in landmarks and row['ID'] != landmark_k:
+            # zwischen landmarks dürfen sich keine weiteren landmarks befinden, um die travel_time zu schätzen
+            landmark_j_found_current = False
+    #travel_time = {'day time': day_time, 'time delta': time_delta}
     print("travel time: " + str(travel_time))
     return travel_time
 
@@ -184,27 +204,40 @@ def match_gps_points(j, k, streets_path, trip_path):
         #TODO: Exception
 
     #falls mehrmals befahren (durch common_trips überprüfbar) Uhrzeiten beachten, Achtung Richtung beachten!
-
-
     return gps_points
 
-def estimate_travel_times(landmarks, dirPath_edge_id_lists, streets_path, dirPath_logs):
-    travel_time = defaultdict(list)
+def estimate_travel_times(landmarks, dirPath_edge_id_lists):
+    travel_time = defaultdict(lambda: defaultdict(list))
+    common_trips = defaultdict(list)
     for j in range(len(landmarks)):
         for k in range(len(landmarks)):
-            if landmarks[j] < landmarks[k]:
-                common_trips = get_common_trips(landmarks[j], landmarks[k], dirPath_edge_id_lists)
+            if j is not k:
+                common_trips = get_common_trips(landmarks, landmarks[j], landmarks[k], dirPath_edge_id_lists, common_trips)
+
     for key in common_trips:
         landmark_j = int(key.split("-")[0])
         landmark_k = int(key.split("-")[1])
         for value in common_trips[key]:
-            trip_path = os.path.join(dirPath_logs, str(value) + ".txt")
-            travel_time[key].append(get_travel_times(landmark_j, landmark_k, streets_path, trip_path))
-    print("travel time: " + str(travel_time))
+            #trip_path = os.path.join(dirPath_logs, str(value) + ".txt")
+            edge_id_list_extended_path = os.path.join(dirPath_edge_id_lists, str(value) + ".txt")
+            travel_time[key] = get_travel_times(landmarks, landmark_j, landmark_k, edge_id_list_extended_path)
     print("common trips: " + str(common_trips))
+    print("travel time: " + str(travel_time))
+    #TODO: V-Clustering
+    #Liste mit allen travel_times in travel_time
+    L_datetimes = []
+    for key in travel_time:
+        for value in travel_time[key]['delta_time']:
+            L_datetimes.append(value)
+    L_datetimes.sort()
+    print(L_datetimes)
+    # convert datetimes to seconds
+    L_seconds = []
+    for l in L_datetimes:
+        L_seconds.append(datetime.timedelta(l).total_seconds()) #TODO: hier weitermachen
+    print(L_seconds)
+    variance_L = np.var(L_seconds)
+    print(variance_L)
+    #TODO: set treshold
 
-
-    #sicherstellen, dass zwei landmarks innerhalb einer einzelnen Fahrt besucht wurden, sonst sind travel_times nicht repräsentativ
-    #welche Tageszeit/Uhrzeit wird bei travel_time vermerkt
-    #könnte sein, dass innerhalb einer Fahrt Strecken zwischen landmarks mehrmals abgefahren werden(vllt den Eintrag in edge_id_list mit bool-flag versehen)
-
+    #TODO: VE-Clustering

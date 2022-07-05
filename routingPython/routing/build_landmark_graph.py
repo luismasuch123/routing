@@ -22,7 +22,7 @@ def get_k_landmarks(k, dirPath_edge_id_lists):
     print(sorted_values)
     k_landmarks = []
     for i in range(k):
-        k_landmarks.append(sorted_values[i])
+        k_landmarks.append(int(sorted_values[i]))
     return k_landmarks
 
 #def visualize_landmarks(k_landmarks)
