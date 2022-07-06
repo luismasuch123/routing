@@ -230,14 +230,102 @@ def estimate_travel_times(landmarks, dirPath_edge_id_lists):
         for value in travel_time[key]['delta_time']:
             L_datetimes.append(value)
     L_datetimes.sort()
-    print(L_datetimes)
+    print("L_datetimes: " + str(L_datetimes))
     # convert datetimes to seconds
     L_seconds = []
     for l in L_datetimes:
-        L_seconds.append(datetime.timedelta(l).total_seconds()) #TODO: hier weitermachen
-    print(L_seconds)
+        L_seconds.append(l.total_seconds())
+    print("L_seconds: " + str(L_seconds))
+
     variance_L = np.var(L_seconds)
-    print(variance_L)
+    print("variance_L: " + str(variance_L))
+    WAV_i_L = []
+    bigger_than_treshold = True
+    treshold = 2.0
+    v_cluster_indeces = []
+    v_cluster_values = []
+    #while bigger_than_treshold:
+    for i in range(1, len(L_seconds)): #TODO: mehr als eine Partition zulassen: wie genau wird treshold gesetzt (wenn WAV_i_L unter treshold)
+        L_1 = L_seconds[0:i]
+        L_2 = L_seconds[i:len(L_seconds)]
+        print("L_1: " + str(L_1))
+        print("L_2: " + str(L_2))
+        WAV_i_L.append((len(L_1) / len(L_seconds)) * np.var(L_1) + (len(L_2) / len(L_seconds)) * np.var(L_2))
+    print("WAV_i_L: " + str(WAV_i_L))
+    v_cluster_indeces.append(WAV_i_L.index(min(WAV_i_L))) #bester Split Indeces: i-tes Element gehört noch zu L_2 seconds
+    for ci in v_cluster_indeces:
+        v_cluster_values.append(L_seconds[ci])  # bester Split Werte: i-tes Element gehört noch zu L_2 seconds
+    print("v_cluster_indeces: " + str(v_cluster_indeces))
+    print("v_cluster_values: " + str(v_cluster_values))
+        #if min(WAV_i_L) < treshold:
+            #bigger_than_treshold = False
     #TODO: set treshold
 
     #TODO: VE-Clustering
+    S_arriving_times = []
+    for key in travel_time:
+        for value in travel_time[key]['day_time']:
+            S_arriving_times.append(value)
+    S_arriving_times.sort()
+    print("S_arriving_times :" + str(S_arriving_times))
+    # convert datetimes to seconds
+    S_hours = []
+    for s in S_arriving_times:
+        S_hours.append(s.hour + s.minute / 60 + s.second / 3600)
+    print("S_hours: " + str(S_hours))
+
+    entropy_S = 0
+    for i in v_cluster_indeces:
+        p_i = (i+1) / len(L_seconds)
+        entropy_S -= p_i * math.log(p_i)
+    print("entropy_S: " + str(entropy_S))
+    WAV_i_L = []
+    for i in range(1,len(S_hours)):  # TODO: mehr als eine Partition zulassen: wie genau wird treshold gesetzt (wenn WAV_i_L unter treshold)
+        S_1 = S_hours[0:i]
+        S_2 = S_hours[i:len(L_seconds)]
+        #TODO: Partitionsindeces speichern, um sie dann beim cluster_counter nutzen zu können
+        print("S_1: " + str(S_1))
+        print("S_2: " + str(S_2))
+        entropy_S_1 = 0
+        entropy_S_2 = 0
+        v_cluster_counter = [2][len(v_cluster_indeces)+1]  # TODO: für wenn später mehr als zwei cluster
+        for ci in range(v_cluster_indeces):
+            #TODO: innerhalb der Partition bestimmen wie groß der Anteil der verschiedenen V-Clustertypen ist
+            #für alle travel_times mit hours <= hours(i) Clustertypen zählen und daraus p_i's ableiten
+            for key in travel_time:
+                for value in travel_time[key]['day_time']:
+                    hour = value.hour + value.minute / 60 + value.second / 3600
+                    if ci == 0:
+                        if S_1.contains(hour) & travel_time[key]['delta_time'].totalseconds() <= v_cluster_values[ci]: #TODO: auf mehrere Cluster (v, als auch e auslegen)
+                            v_cluster_counter[0][ci] += 1
+                        elif S_2.contains(hour) & travel_time[key]['delta_time'].totalseconds() <= v_cluster_values[ci]:
+                            v_cluster_counter[1][ci] += 1
+                    elif ci < len(v_cluster_indeces):
+                        if S_1.contains(hour) & travel_time[key]['delta_time'].totalseconds() > v_cluster_values[ci-1] & travel_time[key]['delta_time'].totalseconds() <= v_cluster_values[ci]: #TODO: auf mehrere Cluster (v, als auch e auslegen)
+                            v_cluster_counter[0][ci] += 1
+                        elif S_2.contains(hour) & travel_time[key]['delta_time'].totalseconds() <= v_cluster_values[ci]:
+                            v_cluster_counter[1][ci] += 1
+            p_i_1 = v_cluster_counter[0][ci] / len(S_1) #TODO: p_i von letztem c_i auf Basis der anderen pi[ci] berechnen
+            p_i_2 = v_cluster_counter[1][ci] / len(S_2)
+            entropy_S_1 -= p_i_1 * math.log(p_i_1)
+            entropy_S_2 -= p_i_2 * math.log(p_i_2)
+        #p_i für letztes v_cluster und entropy bestimmen
+        p_i_1 = (len(S_1) - sum(v_cluster_counter[0])) / len(S_1)
+        p_i_2 = (len(S_2) - sum(v_cluster_counter[1])) / len(S_2)
+        entropy_S_1 -= p_i_1 * math.log(p_i_1)
+        entropy_S_2 -= p_i_2 * math.log(p_i_2)
+        print("entropy_S_1: " + str(entropy_S_1))
+        print("entropy_S_2: " + str(entropy_S_2))
+
+        WAE_i_S = []
+        WAE_i_S.append((len(S_1) / len(S_hours)) * entropy_S_1 + (len(S_2) / len(S_hours)) * entropy_S_2)
+    print("WAE_i_S: " + str(WAE_i_S))
+    e_cluster_indeces = []
+    e_cluster_values = []
+    e_cluster_indeces.append(WAE_i_S.index(min(WAE_i_S)))  # bester Split Indeces: i-tes Element gehört noch zu L_2 seconds
+    for ci in e_cluster_indeces:
+        e_cluster_values.append(S_hours[ci])  # bester Split Werte: i-tes Element gehört noch zu L_2 seconds
+    print("e_cluster_indeces: " + str(e_cluster_indeces))
+    print("e_cluster_values: " + str(e_cluster_values))
+    # TODO: set treshold
+    #TODO: visualize Clustering
