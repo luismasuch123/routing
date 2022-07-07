@@ -49,3 +49,28 @@ Data(UTC) Time(UTC) Latitude Longitude
 12-Oct-2013 18:16:09 -37.798574 144.946667
 12-Oct-2013 18:16:10 -37.798569 144.946662
 12-Oct-2013 18:16:11 -37.798566 144.946637
+
+                                for ci in range(len(v_cluster_indeces)):
+                                    # TODO: innerhalb der Partition bestimmen wie groß der Anteil der verschiedenen V-Clustertypen ist
+                                    # für alle travel_times mit hours <= hours(i) Clustertypen zählen und daraus p_i's ableiten
+                                    for key in travel_time:
+                                        for value in travel_time[key]['day_time']:
+                                            index_value = travel_time[key]['day_time'].index(value)
+                                            hour = value.hour + value.minute / 60 + value.second / 3600
+                                            if ci == 0:
+                                                for s in range(number_partitions + 1):
+                                                    if hour in S_help[s] and travel_time[key]['delta_time'][index_value].total_seconds() <= v_cluster_values[ci]:  # TODO: auf mehrere Cluster (v, als auch e auslegen)
+                                                        v_cluster_counter[0][ci] += 1
+                                            elif ci < len(v_cluster_indeces):
+                                                if hour in S_help[0] and travel_time[key]['delta_time'][index_value].total_seconds() > \
+                                                        v_cluster_values[ci - 1] and travel_time[key]['delta_time'][index_value].total_seconds() <= \
+                                                        v_cluster_values[ci]:  # TODO: auf mehrere Cluster (v, als auch e auslegen)
+                                                    v_cluster_counter[0][ci] += 1
+                                                for p in range(1, number_partitions + 1):
+                                                    if hour in S_help[p] and travel_time[key]['delta_time'][index_value].total_seconds() <= v_cluster_values[ci]:
+                                                        v_cluster_counter[p][ci] += 1
+                                    # p_i für letztes v_cluster und entropy bestimmen
+                                    for s in range(len(S_help)):
+                                        p_i[ci] = v_cluster_counter[s][ci] / len(S_help[s])
+                                        if p_i[ci] > 0:
+                                            entropy_S[s] -= p_i[ci] * math.log(p_i[ci])
