@@ -242,7 +242,6 @@ def estimate_travel_times(landmarks, dirPath_edge_id_lists):
     bigger_than_treshold = True
     treshold = 2.0 #TODO: worauf treshold setzen?
     v_cluster_indeces = []
-    v_cluster_values = []
     L = []
     L_help = []
     number_partitions = 1
@@ -322,7 +321,7 @@ def estimate_travel_times(landmarks, dirPath_edge_id_lists):
             number_partitions += 1
             print("min(WAV_i_L) >= treshold")
     #TODO: set treshold
-    '''
+
     #TODO: VE-Clustering
     S_arriving_times = []
     for key in travel_time:
@@ -339,56 +338,196 @@ def estimate_travel_times(landmarks, dirPath_edge_id_lists):
     entropy_S = 0
     for i in v_cluster_indeces:
         p_i = (i+1) / len(L_seconds)
-        entropy_S -= p_i * math.log(p_i)
+        if p_i > 0:
+            entropy_S -= p_i * math.log(p_i)
     print("entropy_S: " + str(entropy_S))
-    WAV_i_L = []
-    for i in range(1,len(S_hours)):  # TODO: mehr als eine Partition zulassen: wie genau wird treshold gesetzt (wenn WAV_i_L unter treshold)
-        S_1 = S_hours[0:i]
-        S_2 = S_hours[i:len(L_seconds)]
-        #TODO: Partitionsindeces speichern, um sie dann beim cluster_counter nutzen zu können
-        print("S_1: " + str(S_1))
-        print("S_2: " + str(S_2))
-        entropy_S_1 = 0
-        entropy_S_2 = 0
-        v_cluster_counter = [2][len(v_cluster_indeces)+1]  # TODO: für wenn später mehr als zwei cluster
-        for ci in range(v_cluster_indeces):
-            #TODO: innerhalb der Partition bestimmen wie groß der Anteil der verschiedenen V-Clustertypen ist
-            #für alle travel_times mit hours <= hours(i) Clustertypen zählen und daraus p_i's ableiten
-            for key in travel_time:
-                for value in travel_time[key]['day_time']:
-                    hour = value.hour + value.minute / 60 + value.second / 3600
-                    if ci == 0:
-                        if S_1.contains(hour) & travel_time[key]['delta_time'].totalseconds() <= v_cluster_values[ci]: #TODO: auf mehrere Cluster (v, als auch e auslegen)
-                            v_cluster_counter[0][ci] += 1
-                        elif S_2.contains(hour) & travel_time[key]['delta_time'].totalseconds() <= v_cluster_values[ci]:
-                            v_cluster_counter[1][ci] += 1
-                    elif ci < len(v_cluster_indeces):
-                        if S_1.contains(hour) & travel_time[key]['delta_time'].totalseconds() > v_cluster_values[ci-1] & travel_time[key]['delta_time'].totalseconds() <= v_cluster_values[ci]: #TODO: auf mehrere Cluster (v, als auch e auslegen)
-                            v_cluster_counter[0][ci] += 1
-                        elif S_2.contains(hour) & travel_time[key]['delta_time'].totalseconds() <= v_cluster_values[ci]:
-                            v_cluster_counter[1][ci] += 1
-            p_i_1 = v_cluster_counter[0][ci] / len(S_1) #TODO: p_i von letztem c_i auf Basis der anderen pi[ci] berechnen
-            p_i_2 = v_cluster_counter[1][ci] / len(S_2)
-            entropy_S_1 -= p_i_1 * math.log(p_i_1)
-            entropy_S_2 -= p_i_2 * math.log(p_i_2)
-        #p_i für letztes v_cluster und entropy bestimmen
-        p_i_1 = (len(S_1) - sum(v_cluster_counter[0])) / len(S_1)
-        p_i_2 = (len(S_2) - sum(v_cluster_counter[1])) / len(S_2)
-        entropy_S_1 -= p_i_1 * math.log(p_i_1)
-        entropy_S_2 -= p_i_2 * math.log(p_i_2)
-        print("entropy_S_1: " + str(entropy_S_1))
-        print("entropy_S_2: " + str(entropy_S_2))
 
-        WAE_i_S = []
-        WAE_i_S.append((len(S_1) / len(S_hours)) * entropy_S_1 + (len(S_2) / len(S_hours)) * entropy_S_2)
-    print("WAE_i_S: " + str(WAE_i_S))
+    bigger_than_treshold = True
+    treshold = -2.0  # TODO: worauf treshold setzen?
     e_cluster_indeces = []
-    e_cluster_values = []
-    e_cluster_indeces.append(WAE_i_S.index(min(WAE_i_S)))  # bester Split Indeces: i-tes Element gehört noch zu L_2 seconds
-    for ci in e_cluster_indeces:
-        e_cluster_values.append(S_hours[ci])  # bester Split Werte: i-tes Element gehört noch zu L_2 seconds
-    print("e_cluster_indeces: " + str(e_cluster_indeces))
-    print("e_cluster_values: " + str(e_cluster_values))
+    S = []
+    S_help = []
+    number_partitions = 1
+    while bigger_than_treshold and len(S_help) < len(S_hours):
+        print("partition :" + str(number_partitions))
+        WAE_i_S = []
+        for i in range(len(S_hours)-1): #TODO: mehr als eine Partition zulassen: wie genau wird treshold gesetzt (wenn WAV_i_L unter treshold)
+            if i not in e_cluster_indeces:
+                print("i: " + str(i))
+                S_help = S.copy()
+                p_i = [0 for ci in range(len(L))]
+                entropy_S = [0 for p in range(number_partitions+1)]
+                print("entropy_S: " + str(entropy_S))
+                print("p_i: " + str(p_i))
+                v_cluster_counter = [[0 for l in range(len(L))] for p in range(number_partitions + 1)]
+                if number_partitions == 1:
+                    S_help.insert(0, S_hours[0:i+1])
+                    S_help.insert(1, S_hours[i+1:len(S_hours)])
+                    print("S_1: " + str(S_help[0]))
+                    print("S_2: " + str(S_help[1]))
+                    for ci in range(len(v_cluster_indeces)):
+                        # TODO: innerhalb der Partition bestimmen wie groß der Anteil der verschiedenen V-Clustertypen ist
+                        # für alle travel_times mit hours <= hours(i) Clustertypen zählen und daraus p_i's ableiten
+                        for key in travel_time:
+                            for value in travel_time[key]['day_time']:
+                                index_value = travel_time[key]['day_time'].index(value)
+                                hour = value.hour + value.minute / 60 + value.second / 3600
+                                if ci == 0:
+                                    for s in range(number_partitions+1):
+                                        if hour in S_help[s] and travel_time[key]['delta_time'][index_value].total_seconds() <= v_cluster_values[ci]:  # TODO: auf mehrere Cluster (v, als auch e auslegen)
+                                            v_cluster_counter[s][ci] += 1
+                                elif ci < len(v_cluster_indeces):
+                                    if hour in S_help[0] and travel_time[key]['delta_time'][index_value].total_seconds() > \
+                                            v_cluster_values[ci - 1] and travel_time[key]['delta_time'][index_value].total_seconds() <= \
+                                            v_cluster_values[ci]:  # TODO: auf mehrere Cluster (v, als auch e auslegen)
+                                        v_cluster_counter[0][ci] += 1
+                                    elif hour in S_help[1] and travel_time[key]['delta_time'][index_value].total_seconds() <= \
+                                            v_cluster_values[ci]:
+                                        v_cluster_counter[1][ci] += 1
+                        # p_i für letztes v_cluster und entropy bestimmen
+                        for s in range(len(S_help)):
+                            p_i[ci] = v_cluster_counter[0][ci] / len(S_help[s])
+                            if p_i[ci] > 0:
+                                entropy_S[s] -= p_i[ci] * math.log(p_i[ci])
+                else:
+                    for p in range(number_partitions-1):
+                        if (p == 0 and i <= e_cluster_indeces[p]) or i > e_cluster_indeces[p-1]:
+                            S_help = S.copy()
+                            print("p: " + str(p))
+                            modification = False
+                            if i < e_cluster_indeces[p] and p == 0:
+                                modification = True
+                                print("i < e_cluster_indeces[p] and p == 0")
+                                print("S_help: " + str(S_help))
+                                S_help[p] = S_hours[i+1:e_cluster_indeces[p]+1]
+                                print("S_help: " + str(S_help))
+                                S_help.insert(p, S_hours[0:i+1])
+                                print("S_help: " + str(S_help))
+                                #v_cluster_counter = [number_partitions + 1][len(L)]  # TODO: für wenn später mehr als zwei cluster
+                                for ci in range(len(v_cluster_indeces)):
+                                    # TODO: innerhalb der Partition bestimmen wie groß der Anteil der verschiedenen V-Clustertypen ist
+                                    # für alle travel_times mit hours <= hours(i) Clustertypen zählen und daraus p_i's ableiten
+                                    for key in travel_time:
+                                        for value in travel_time[key]['day_time']:
+                                            index_value = travel_time[key]['day_time'].index(value)
+                                            hour = value.hour + value.minute / 60 + value.second / 3600
+                                            if ci == 0:
+                                                for s in range(number_partitions + 1):
+                                                    if hour in S_help[s] and travel_time[key]['delta_time'][index_value].total_seconds() <= v_cluster_values[ci]:  # TODO: auf mehrere Cluster (v, als auch e auslegen)
+                                                        v_cluster_counter[s][ci] += 1
+                                            elif ci < len(v_cluster_indeces):
+                                                if hour in S_help[0] and travel_time[key]['delta_time'][index_value].total_seconds() > \
+                                                        v_cluster_values[ci - 1] and travel_time[key]['delta_time'][index_value].total_seconds() <= \
+                                                        v_cluster_values[ci]:  # TODO: auf mehrere Cluster (v, als auch e auslegen)
+                                                    v_cluster_counter[0][ci] += 1
+                                                for p in range(1, number_partitions + 1):
+                                                    if hour in S_help[p] and travel_time[key]['delta_time'][index_value].total_seconds() <= v_cluster_values[ci]:
+                                                        v_cluster_counter[p][ci] += 1
+                                    # p_i für letztes v_cluster und entropy bestimmen
+                                    for s in range(len(S_help)):
+                                        p_i[ci] = v_cluster_counter[0][ci] / len(S_help[s])
+                                        if p_i[ci] > 0:
+                                            entropy_S[s] -= p_i[ci] * math.log(p_i[ci])
+                            elif i < e_cluster_indeces[p]:
+                                modification = True
+                                print("i < e_cluster_indeces[p]")
+                                print("S_help: " + str(S_help))
+                                S_help[p] = S_hours[i+1:e_cluster_indeces[p]+1]
+                                print("S_help: " + str(S_help))
+                                S_help.insert(p, S_hours[e_cluster_indeces[p-1]+1:i+1])
+                                print("S_help: " + str(S_help))
+                                #v_cluster_counter = [number_partitions + 1][len(L)]  # TODO: für wenn später mehr als zwei cluster
+                                for ci in range(len(v_cluster_indeces)):
+                                    # TODO: innerhalb der Partition bestimmen wie groß der Anteil der verschiedenen V-Clustertypen ist
+                                    # für alle travel_times mit hours <= hours(i) Clustertypen zählen und daraus p_i's ableiten
+                                    for key in travel_time:
+                                        for value in travel_time[key]['day_time']:
+                                            index_value = travel_time[key]['day_time'].index(value)
+                                            hour = value.hour + value.minute / 60 + value.second / 3600
+                                            if ci == 0:
+                                                for s in range(number_partitions + 1):
+                                                    if hour in S_help[s] and travel_time[key]['delta_time'][index_value].total_seconds() <= v_cluster_values[ci]:  # TODO: auf mehrere Cluster (v, als auch e auslegen)
+                                                        v_cluster_counter[0][ci] += 1
+                                            elif ci < len(v_cluster_indeces):
+                                                if hour in S_help[0] and travel_time[key]['delta_time'][index_value].total_seconds() > \
+                                                        v_cluster_values[ci - 1] and travel_time[key]['delta_time'][index_value].total_seconds() <= \
+                                                        v_cluster_values[ci]:  # TODO: auf mehrere Cluster (v, als auch e auslegen)
+                                                    v_cluster_counter[0][ci] += 1
+                                                for p in range(1, number_partitions + 1):
+                                                    if hour in S_help[p] and travel_time[key]['delta_time'][index_value].total_seconds() <= v_cluster_values[ci]:
+                                                        v_cluster_counter[p][ci] += 1
+                                    # p_i für letztes v_cluster und entropy bestimmen
+                                    for s in range(len(S_help)):
+                                        p_i[ci] = v_cluster_counter[s][ci] / len(S_help[s])
+                                        if p_i[ci] > 0:
+                                            entropy_S[s] -= p_i[ci] * math.log(p_i[ci])
+                            elif i > e_cluster_indeces[p] and p == number_partitions-2:
+                                modification = True
+                                print("i > e_cluster_indeces[p]")
+                                print("S_help: " + str(S_help))
+                                S_help.append(S_hours[i+1:len(S_hours)])
+                                print("S_help: " + str(S_help))
+                                S_help[p+1] = S_hours[e_cluster_indeces[p]+1:i+1]
+                                print("S_help: " + str(S_help))
+                                #v_cluster_counter = [number_partitions + 1][len(L)]  # TODO: für wenn später mehr als zwei cluster
+                                for ci in range(len(v_cluster_indeces)):
+                                    # TODO: innerhalb der Partition bestimmen wie groß der Anteil der verschiedenen V-Clustertypen ist
+                                    # für alle travel_times mit hours <= hours(i) Clustertypen zählen und daraus p_i's ableiten
+                                    for key in travel_time:
+                                        for value in travel_time[key]['day_time']:
+                                            index_value = travel_time[key]['day_time'].index(value)
+                                            hour = value.hour + value.minute / 60 + value.second / 3600
+                                            if ci == 0:
+                                                for s in range(number_partitions + 1):
+                                                    if hour in S_help[s] and travel_time[key]['delta_time'][index_value].total_seconds() <= v_cluster_values[ci]:  # TODO: auf mehrere Cluster (v, als auch e auslegen)
+                                                        v_cluster_counter[0][ci] += 1
+                                            elif ci < len(v_cluster_indeces):
+                                                if hour in S_help[0] and travel_time[key]['delta_time'][index_value].total_seconds() > \
+                                                        v_cluster_values[ci - 1] and travel_time[key]['delta_time'][index_value].total_seconds() <= \
+                                                        v_cluster_values[ci]:  # TODO: auf mehrere Cluster (v, als auch e auslegen)
+                                                    v_cluster_counter[0][ci] += 1
+                                                for p in range(1, number_partitions + 1):
+                                                    if hour in S_help[p] and travel_time[key]['delta_time'][index_value].total_seconds() <= v_cluster_values[ci]:
+                                                        v_cluster_counter[p][ci] += 1
+                                    # p_i für letztes v_cluster und entropy bestimmen
+                                    for s in range(len(S_help)):
+                                        p_i[ci] = v_cluster_counter[s][ci] / len(S_help[s])
+                                        if p_i[ci] > 0:
+                                            entropy_S[s] -= p_i[ci] * math.log(p_i[ci])
+                if modification:
+                    WAE_i_S_sum = 0
+                    for l in range(len(S_help)):
+                        p_i[len(L) - 1] = (len(S_help[s]) - sum(v_cluster_counter[s])) / len(S_help[s])
+                        if p_i[len(L) - 1] > 0:
+                            entropy_S[s] -= p_i[len(L) - 1] * math.log(p_i[len(L) - 1])
+                        print("entropy_S_" + str(s + 1) + ": " + str(entropy_S[s]))
+                        WAE_i_S_sum += (len(S_help[s]) / len(S_hours)) * entropy_S[s]
+                    WAE_i_S.append(WAE_i_S_sum)
+                    print("WAE_i_S: " + str(WAE_i_S))
+            else:
+                WAE_i_S.append(100000)
+                print("i: " + str(i))
+                print("WAE_i_S: " + str(WAE_i_S))
+        e_cluster_indeces.append(WAE_i_S.index(min(WAE_i_S))) #bester Split Indeces: i-tes Element gehört noch zu L_2 seconds
+        e_cluster_indeces.sort()
+        e_cluster_values = []
+        for ci in e_cluster_indeces:
+            e_cluster_values.append(S_hours[ci])  # bester Split Werte: i-tes Element gehört noch zu L_2 seconds
+        e_cluster_values.sort()
+        #S updaten, d.h. neuen e_cluster_index berücksichtigen
+        S.clear()
+        S.append(S_hours[0:e_cluster_indeces[0]+1])
+        for p in range(1, number_partitions):
+            S.append(S_hours[e_cluster_indeces[p-1]+1: e_cluster_indeces[p]+1])
+        S.append(S_hours[e_cluster_indeces[number_partitions-1]+1:len(S_hours)])
+        print("e_cluster_indeces: " + str(e_cluster_indeces))
+        print("e_cluster_values: " + str(e_cluster_values))
+        if min(WAE_i_S) < treshold:
+            bigger_than_treshold = False
+            print("min(WAV_i_S) < treshold")
+            print("min(WAV_i_S: " + str(min(WAE_i_S)))
+        else:
+            number_partitions += 1
+            print("min(WAV_i_S) >= treshold")
     # TODO: set treshold
     #TODO: visualize Clustering
-    '''
