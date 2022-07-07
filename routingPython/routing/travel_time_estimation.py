@@ -239,28 +239,90 @@ def estimate_travel_times(landmarks, dirPath_edge_id_lists):
 
     variance_L = np.var(L_seconds)
     print("variance_L: " + str(variance_L))
-    WAV_i_L = []
     bigger_than_treshold = True
-    treshold = 2.0
+    treshold = 2.0 #TODO: worauf treshold setzen?
     v_cluster_indeces = []
     v_cluster_values = []
-    #while bigger_than_treshold:
-    for i in range(1, len(L_seconds)): #TODO: mehr als eine Partition zulassen: wie genau wird treshold gesetzt (wenn WAV_i_L unter treshold)
-        L_1 = L_seconds[0:i]
-        L_2 = L_seconds[i:len(L_seconds)]
-        print("L_1: " + str(L_1))
-        print("L_2: " + str(L_2))
-        WAV_i_L.append((len(L_1) / len(L_seconds)) * np.var(L_1) + (len(L_2) / len(L_seconds)) * np.var(L_2))
-    print("WAV_i_L: " + str(WAV_i_L))
-    v_cluster_indeces.append(WAV_i_L.index(min(WAV_i_L))) #bester Split Indeces: i-tes Element gehört noch zu L_2 seconds
-    for ci in v_cluster_indeces:
-        v_cluster_values.append(L_seconds[ci])  # bester Split Werte: i-tes Element gehört noch zu L_2 seconds
-    print("v_cluster_indeces: " + str(v_cluster_indeces))
-    print("v_cluster_values: " + str(v_cluster_values))
-        #if min(WAV_i_L) < treshold:
-            #bigger_than_treshold = False
+    L = []
+    L_help = []
+    number_partitions = 1
+    while bigger_than_treshold and len(L_help) < len(L_seconds):
+        print("partition :" + str(number_partitions))
+        WAV_i_L = []
+        for i in range(len(L_seconds)-1): #TODO: mehr als eine Partition zulassen: wie genau wird treshold gesetzt (wenn WAV_i_L unter treshold)
+            if i not in v_cluster_indeces:
+                print("i: " + str(i))
+                L_help = L.copy()
+                if number_partitions == 1:
+                    L_help.insert(0, L_seconds[0:i+1])
+                    L_help.insert(1, L_seconds[i+1:len(L_seconds)])
+                    print("L_1: " + str(L_help[0]))
+                    print("L_2: " + str(L_help[1]))
+                    WAV_i_L.append((len(L_help[0]) / len(L_seconds)) * np.var(L_help[0]) + (len(L_help[1]) / len(L_seconds)) * np.var(L_help[1]))
+                    print("WAV_i_L: " + str(WAV_i_L))
+                else:
+                    for p in range(number_partitions-1):
+                        if (p == 0 and i <= v_cluster_indeces[p]) or i > v_cluster_indeces[p-1]:
+                            L_help = L.copy()
+                            print("p: " + str(p))
+                            modification = False
+                            if i < v_cluster_indeces[p] and p == 0:
+                                modification = True
+                                print("i < v_cluster_indeces[p] and p == 0")
+                                print("L_help: " + str(L_help))
+                                L_help[p] = L_seconds[i+1:v_cluster_indeces[p]+1]
+                                print("L_help: " + str(L_help))
+                                L_help.insert(p, L_seconds[0:i+1])
+                                print("L_help: " + str(L_help))
+                            elif i < v_cluster_indeces[p]:
+                                modification = True
+                                print("i < v_cluster_indeces[p]")
+                                print("L_help: " + str(L_help))
+                                L_help[p] = L_seconds[i+1:v_cluster_indeces[p]+1]
+                                print("L_help: " + str(L_help))
+                                L_help.insert(p, L_seconds[v_cluster_indeces[p-1]+1:i+1])
+                                print("L_help: " + str(L_help))
+                            elif i > v_cluster_indeces[p] and p == number_partitions-2:
+                                modification = True
+                                print("i > v_cluster_indeces[p]")
+                                print("L_help: " + str(L_help))
+                                L_help.append(L_seconds[i+1:len(L_seconds)])
+                                print("L_help: " + str(L_help))
+                                L_help[p+1] = L_seconds[v_cluster_indeces[p]+1:i+1]
+                                print("L_help: " + str(L_help))
+                            if modification:
+                                WAV_i_L_sum = 0
+                                for l in range(len(L_help)):
+                                    WAV_i_L_sum += (len(L_help[l]) / len(L_seconds)) * np.var(L_help[l])
+                                print("WAV_i_L_sum: " + str(WAV_i_L_sum))
+                                WAV_i_L.append(WAV_i_L_sum)
+                                print("WAV_i_L: " + str(WAV_i_L))
+            else:
+                WAV_i_L.append(100000)
+                print("i: " + str(i))
+                print("WAV_i_L: " + str(WAV_i_L))
+        v_cluster_indeces.append(WAV_i_L.index(min(WAV_i_L))) #bester Split Indeces: i-tes Element gehört noch zu L_2 seconds
+        v_cluster_indeces.sort()
+        v_cluster_values = []
+        for ci in v_cluster_indeces:
+            v_cluster_values.append(L_seconds[ci])  # bester Split Werte: i-tes Element gehört noch zu L_2 seconds
+        v_cluster_values.sort()
+        #L updaten, d.h. neuen v_cluster_index berücksichtigen
+        L.clear()
+        L.append(L_seconds[0:v_cluster_indeces[0]+1])
+        for p in range(1, number_partitions):
+            L.append(L_seconds[v_cluster_indeces[p-1]+1: v_cluster_indeces[p]+1])
+        L.append(L_seconds[v_cluster_indeces[number_partitions-1]+1:len(L_seconds)])
+        print("v_cluster_indeces: " + str(v_cluster_indeces))
+        print("v_cluster_values: " + str(v_cluster_values))
+        if min(WAV_i_L) < treshold:
+            bigger_than_treshold = False
+            print("min(WAV_i_L) < treshold")
+        else:
+            number_partitions += 1
+            print("min(WAV_i_L) >= treshold")
     #TODO: set treshold
-
+    '''
     #TODO: VE-Clustering
     S_arriving_times = []
     for key in travel_time:
@@ -329,3 +391,4 @@ def estimate_travel_times(landmarks, dirPath_edge_id_lists):
     print("e_cluster_values: " + str(e_cluster_values))
     # TODO: set treshold
     #TODO: visualize Clustering
+    '''
