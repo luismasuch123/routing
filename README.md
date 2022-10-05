@@ -20,3 +20,5 @@ Aktuell existiert noch keine Graphen-Struktur, welche die landmarks sowie deren 
 Falls zwischen zwei landmarks nur eine einzige Tour durchgeführt wurde, ist im Cluster kein Intervall angegeben, sondern der Datenpunkt.
 ***
 Test.py ist die main-Methode, in welcher die landmarks aus den edge_id_lists (Kanten, welche das Ergebnis des map-matchings sind) gefunden werden und anschließend die Zeiten zwischen zwei landmarks durch die travel_time_estimation() bestimmt werden.
+***
+Um die Ergebnisse des routing zu verbessern bzw. repräsentativer zu machen, sollten alle GPS-Logs von Beijing gematched werden.
