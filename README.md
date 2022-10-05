@@ -9,11 +9,14 @@ The IVMM algorithm finds the fastest route in a given road network by taking int
 I have implemented the T-Drive algorithm. The algorithm doesn't consider the need of rematching the resulting landmarks with the time they were visited, which is necessary to estimate the travel times between landmarks. I try to deal with that issue.
 
 #Anmerkungen 
-Aktuell build_landmark_graph fertig implementiert. Die restlichen Schritte noch nicht.
+Aktuell ist build_landmark_graph fertig implementiert. Die travel_time_estimation ist beinahe fertig. Die restlichen Schritte noch nicht.
 ***
-Bei der travel_time estimation bestehen mehrere Probleme. Zum einen müssen für alle Paare von landmarks, in jedem GPS-Log, in dem beide landmarks vorkommen, die GPS-Koordinaten mit den Zeitpunkten gematched werden, zu denen die landmarks befahren wurden.
-Dabei können nicht einfach die GPS-Punkte mit der geringsten Distanz zu den landmarks gewählt werden, da die landmarks auf Basis von mehreren nahegelegenen GPS-Punkten gesetzt/abgestimmt wurden. Eine landmark ist demnach mehreren GPS-Punkten zugehörig. Diese Richtungsabhängigkeit muss berücksichtigt werden, da ansonsten eine landmark einem GPS-Punkt zugeordnet werden könnte, welcher zwar am nächsten an der landmark liegt, aber erst zu einem späteren/früheren Zeitpunkt befahren wurde und gar nicht zur landmark beiträgt.
-Zum anderen muss auch berücksichtigt werden, dass landmarks mehrmals innerhalb eines GPS-Logs auftauchen können.
-Möglicherweise könnte man bereits beim map matching, die resultierenden edges mit Zeitpunkten versehen. Daraus würden weniger Fehler beim "re-matching" resultieren bzw. wäre dies dann nicht mehr notwendig.
+Um die travel_time_estimation zu vereinfachen werden bereits die edges, die aus dem map-matching resultieren, direkt mit den Zeitpunkten verknüpft. Ansonsten müsste man die edges mit den GPS-Logs rematchen.
 ***
+Beim Clustering für die travel_time_estimation werden tresholds gesetzt, bei deren Unterschreitung nicht weiter geclustert wird. Aus dem Paper ist nicht ersichtlich, wie die tresholds gesetzt werden soll. Aktuell sind sie auf 0.5 gesetzt. In estimate_travel_times besteht die Möglichkeit die Anzahl der Cluster zu begrenzen (aktuell: set_cluster_limit = True). Dabei können sowohl das V-Clustering, als auch das E-Clustering manuell begrenzt werden.
 Das rough routing, sowie das refined routing müssen noch implementiert werden. Für die schnellsten Routen zwischen den landmarks könnte A* oder Dijkstraa angewendet werden. Das refined routing wird mithilfe von dynamischer Optimierung durchgeführt.
+Aktuell existiert noch keine Graphen-Struktur, welche die landmarks sowie deren Kanten widerspiegelt. Der Graph kann auf Basis der gefundenen landmarks und dem Cluster bestimmt werden, in dem die Sobald ein Graph erstellt wurde, kann das rough routing durchgeführt werden. (mit rtree.nearest_point() könnte gegebenenfalls die nächste landmark von Start- oder Zielpunkt der Anfrage ausgehend bestimmt werden, um das rough routing durchzuführen)
+***
+Falls zwischen zwei landmarks nur eine einzige Tour durchgeführt wurde, ist im Cluster kein Intervall angegeben, sondern der Datenpunkt.
+***
+Test.py ist die main-Methode, in welcher die landmarks aus den edge_id_lists (Kanten, welche das Ergebnis des map-matchings sind) gefunden werden und anschließend die Zeiten zwischen zwei landmarks durch die travel_time_estimation() bestimmt werden.

@@ -5,8 +5,6 @@ and returning the k landmarks which appear most often.
 import os
 import pandas as pd
 
-#Feld oder doch lieber Set dass über edge-Nummer angesprochen wird, sodass landmarks einfach durch Sortierung nach größten Werten sortiert werden
-
 def count_edges(dirPath_edge_id_lists):
     for file in os.listdir(dirPath_edge_id_lists):
         path = os.path.join(dirPath_edge_id_lists, file)
@@ -19,7 +17,7 @@ def count_edges(dirPath_edge_id_lists):
 def get_k_landmarks(k, dirPath_edge_id_lists):
     edge_count = count_edges(dirPath_edge_id_lists)
     sorted_values = sorted(edge_count, key=edge_count.get, reverse=True)
-    print(sorted_values)
+    #print(sorted_values)
     k_landmarks = []
     for i in range(k):
         k_landmarks.append(int(sorted_values[i]))
